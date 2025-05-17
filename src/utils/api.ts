@@ -1,6 +1,12 @@
 import axios from "axios"
 
 import { NOTION_KEY, NOTION_DATABASE_ID } from "../secret"
+
+// Extend Error type to include originalError property
+interface EnhancedError extends Error {
+	originalError?: any;
+}
+
 const BASE_URL = "https://api.notion.com/v1"
 
 const getDatabase = async () => {
@@ -118,15 +124,33 @@ const addItem = async (data) => {
 		},
 	}
 
-	axios
-		.request(options)
+	// Return Promise for subsequent processing
+	return axios.request(options)
 		.then(function (response) {
-			console.log(response.data)
+			console.log("Successfully added to Notion:", response.data)
 			window.close()
+			return response.data
 		})
 		.catch(function (error) {
-			console.error(error)
-			alert("error")
+			console.error("Error adding to Notion:", error);
+			// Convert error object to more useful error message
+			let errorMessage = "Unknown error";
+			if (error.response) {
+				// Server responded with a status code outside of 2xx range
+				errorMessage = `API Error: ${error.response.status} - ${JSON.stringify(error.response.data)}`;
+				console.error("Error response data:", error.response.data);
+			} else if (error.request) {
+				// Request was made but no response was received
+				errorMessage = "Notion API did not respond, please check your network connection";
+			} else {
+				// Error occurred while setting up the request
+				errorMessage = `Request error: ${error.message}`;
+			}
+			// Throw error with more information
+			const enhancedError = new Error(errorMessage) as EnhancedError;
+			enhancedError.originalError = error;
+			throw enhancedError;
 		})
 }
 export { getDatabase, getPages, addItem }
+
